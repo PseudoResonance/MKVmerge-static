@@ -1,0 +1,59 @@
+name: Build Releases
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build Linux x86
+        run: docker build -t cont -f Dockerfile.linux .
+      - name: Create Docker Container
+        run: |
+          echo "CONTAINER_ID=$( docker create --name temp cont )" >> $GITHUB_OUTPUT
+        id: containerlinux
+      - name: Extract Built Files
+        run: |
+          mkdir /artifacts
+          docker cp ${{ steps.containerlinux.outputs.CONTAINER_ID }}:/i686/mkvmerge /artifacts/mkvmerge-linux-i686
+          docker cp ${{ steps.containerlinux.outputs.CONTAINER_ID }}:/x86_64/mkvmerge /artifacts/mkvmerge-linux-amd64
+          docker rm temp
+
+      - name: Build Linux arm
+        run: docker build -t cont -f Dockerfile.linuxarm .
+      - name: Create Docker Container
+        run: |
+          echo "CONTAINER_ID=$( docker create --name temp cont )" >> $GITHUB_OUTPUT
+        id: containerlinuxarm
+      - name: Extract Built Files
+        run: |
+          mkdir /artifacts
+          docker cp ${{ steps.containerlinuxarm.outputs.CONTAINER_ID }}:/armhf/mkvmerge /artifacts/mkvmerge-linux-armhf
+          docker cp ${{ steps.containerlinuxarm.outputs.CONTAINER_ID }}:/arm64/mkvmerge /artifacts/mkvmerge-linux-arm64
+          docker rm temp
+
+      - name: Build macOS
+        run: docker build -t cont -f Dockerfile.macos .
+      - name: Create Docker Container
+        run: |
+          echo "CONTAINER_ID=$( docker create --name temp cont )" >> $GITHUB_OUTPUT
+        id: containermacos
+      - name: Extract Built Files
+        run: |
+          mkdir /artifacts
+          docker cp ${{ steps.containermacos.outputs.CONTAINER_ID }}:/macos-x86/mkvmerge /artifacts/mkvmerge-darwin-amd64
+          docker cp ${{ steps.containermacos.outputs.CONTAINER_ID }}:/macos-arm/mkvmerge /artifacts/mkvmerge-darwin-arm64
+          docker rm temp
+
+      - name: Archive Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: /artifacts/*
